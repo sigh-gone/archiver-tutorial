@@ -32,59 +32,76 @@ impl HtmlRecord {
     //the tuple returns the unparsed string in the 0's spot
     //returns the parsed link in the 1's spot
     pub fn get_image_links(&self) -> Result<Option<HashSet<(String, String)>>, String> {
+        //checks for base64 images
         lazy_static! {
             static ref RE3: Regex = Regex::new(r";base64,").unwrap();
         }
-        let mut ret_vec: Vec<(String, String)> = vec![];
+        let mut link_hashset: HashSet<(String, String)> = HashSet::new();
+
+        //select image tags
         let selector = Selector::parse("img").unwrap();
+
+        //loop through img tags
         for element in self.html.select(&selector) {
+            //grab the source attribute of the tag
             match element.value().attr("src") {
+                //if we have a link
                 Some(link) => {
+                    //see if a relative link
                     if Url::parse(link) == Err(ParseError::RelativeUrlWithoutBase) {
-                        let base = Url::parse(&self.origin)
-                            .expect("get css links, origin could not be parsed");
-                        let plink = base
+                        //get base url
+                        let plink = Url::parse(&self.origin)
+                            .expect("get css links, origin could not be parsed")
                             .join(link)
                             .expect("css links, could not join")
                             .to_string();
-                        ret_vec.push((link.to_string(), plink.to_string()))
+                        //push to return vector
+                        link_hashset.insert((link.to_string(), plink.to_string()));
+                        //check if base64 and continue if so
                     } else if RE3.is_match(link) {
                         continue;
+                    //if fully formed link, push to return vector
                     } else if let Ok(parsed_link) = Url::parse(link) {
-                        ret_vec.push((link.to_string(), parsed_link.to_string()));
+                        link_hashset.insert((link.to_string(), parsed_link.to_string()));
                     }
                 }
+                //No src, contine
                 None => continue,
             };
         }
-
-        let link_hashset: HashSet<(String, String)> = ret_vec.iter().cloned().collect();
-
+        //If hashset is empty return an Ok of None
         if link_hashset.is_empty() {
             Ok(None)
+        //return some image links
         } else {
             Ok(Some(link_hashset))
         }
     }
 
     pub fn get_css_links(&self) -> Result<Option<HashSet<(String, String)>>, String> {
-        let mut ret_vec: Vec<(String, String)> = vec![];
+        let mut link_hashset: HashSet<(String, String)> = HashSet::new();
+
+        //get links
         let selector = Selector::parse("link").unwrap();
+        //loop through elements
         for element in self.html.select(&selector) {
+            //check if stylesheets
             if element.value().attr("rel").unwrap() == "stylesheet" {
+                //get the href
                 match element.value().attr("href") {
                     Some(link) => {
                         //take care of relative links here
                         if Url::parse(link) == Err(ParseError::RelativeUrlWithoutBase) {
-                            let base = Url::parse(&self.origin)
-                                .expect("get css links, origin could not be parsed");
-                            let plink = base
+                            //create url
+                            let plink = Url::parse(&self.origin)
+                                .expect("get css links, origin could not be parsed")
                                 .join(link)
                                 .expect("css links, could not join")
                                 .to_string();
-                            ret_vec.push((link.to_string(), plink.to_string()))
+                            //add to hashset
+                            link_hashset.insert((link.to_string(), plink.to_string()));
                         } else if let Ok(parsed_link) = Url::parse(link) {
-                            ret_vec.push((link.to_string(), parsed_link.to_string()));
+                            link_hashset.insert((link.to_string(), parsed_link.to_string()));
                         }
                     }
                     None => continue,
@@ -92,8 +109,6 @@ impl HtmlRecord {
             }
         }
 
-        let link_hashset: HashSet<(String, String)> = ret_vec.iter().cloned().collect();
-
         if link_hashset.is_empty() {
             Ok(None)
         } else {
@@ -101,33 +116,38 @@ impl HtmlRecord {
         }
     }
 
+    //get js links
     pub fn get_js_links(&self) -> Result<Option<HashSet<(String, String)>>, String> {
-        let mut ret_vec: Vec<(String, String)> = vec![];
+        //create hashset
+        let mut link_hashset: HashSet<(String, String)> = HashSet::new();
+        //get the selector which is basically used for getting the script tags
         let selector = Selector::parse("script").unwrap();
         for element in self.html.select(&selector) {
+            //get src attribute of the script tag
             match element.value().attr("src") {
                 Some(link) => {
                     if Url::parse(link) == Err(ParseError::RelativeUrlWithoutBase) {
-                        let base = Url::parse(&self.origin)
-                            .expect("get js links, origin could not be parsed ");
-                        let plink = base
+                        //parse relative url
+                        let plink = Url::parse(&self.origin)
+                            .expect("get js links, origin could not be parsed ")
                             .join(link)
                             .expect("js links, could not join")
                             .to_string();
-                        ret_vec.push((link.to_string(), plink.to_string()))
+                        link_hashset.insert((link.to_string(), plink.to_string()));
                     } else if let Ok(parsed_link) = Url::parse(link) {
-                        ret_vec.push((link.to_string(), parsed_link.to_string()));
+                        //url doesnt need to be parsed, add it to the hashset
+                        link_hashset.insert((link.to_string(), parsed_link.to_string()));
                     }
                 }
                 None => continue,
             };
         }
 
-        let link_hashset: HashSet<(String, String)> = ret_vec.iter().cloned().collect();
-
+        //if hashset is empty return a result of None
         if link_hashset.is_empty() {
             Ok(None)
         } else {
+            //return a result of some
             Ok(Some(link_hashset))
         }
     }

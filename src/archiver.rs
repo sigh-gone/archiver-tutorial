@@ -15,11 +15,12 @@ impl Archiver {
         url: &str,
         path: &str,
     ) -> Result<String, String> {
+        //create record
         let mut record = client
             .fetch_html_record(url)
             .await
             .unwrap_or_else(|_| panic!("fetch_html_record failed \n url {}", url));
-
+        //save the page
         match Archiver::save_page(&mut record, client, path).await {
             Ok(archive_path) => Ok(archive_path),
             Err(e) => Err(e),
@@ -31,23 +32,23 @@ impl Archiver {
         client: &mut Client,
         base_path: &str,
     ) -> Result<String, String> {
+        //set up the directory to save the page in
         let url = Url::parse(&html_record.origin).expect("can't parse origin url");
         let host_name = url.host().expect("can't get host").to_string();
         let mut url_path = url.path().to_string();
         let mut base_path = base_path.to_string();
-
         if !base_path.ends_with('/') {
             base_path.push('/');
         }
         if !url_path.ends_with('/') {
             url_path.push('/');
         }
-
         let directory = format!(
             "{}{}{}{}",
             base_path, host_name, url_path, html_record.date_time
         );
 
+        //create the directory
         fs::create_dir_all(&directory).map_err(|e| format!("Failed to create directory: {}", e))?;
 
         //Get images
